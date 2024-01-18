@@ -22,31 +22,62 @@ export class AppController {
   async scrapeKulJobs(): Promise<string[]> {
     const browser = await puppeteer.launch({ headless: 'new' });
     const page = await browser.newPage();
-    await page.goto('https://www.kuleuven.be/personeel/jobsite/jobs/management_professionals?lang=en');
-  
-    // Wait for the element to appear in the page
-    await page.waitForSelector('#results_card', { timeout: 10000 });
-  
-    const jobs = await page.evaluate(() => {
-      const jobs = [];
-      const jobWrappers = document.querySelector('#results_card');
-      const jobRows = jobWrappers.querySelectorAll('.card-block');
-      jobRows.forEach((jobRow) => {
-        const jobTitle = jobRow.querySelector('h6').textContent.trim();
-        const jobFrom = Array.from(jobRow.querySelectorAll('p')).reduce((result, p, index, arr) => index != arr.length - 1 ? result += p.textContent ? p.textContent.trim() : '' + '&' : result += p.textContent ? p.textContent.trim() : '', '');
-        const rawJobPercentage = jobRow.querySelector('.ocupation').textContent.trim();
-        const jobPercentage = rawJobPercentage.startsWith('av_timer') ? rawJobPercentage.substring(8) : rawJobPercentage;
-        const rawJobDeadline = jobRow.querySelector('.apply_before').textContent.trim();
-        const jobDeadline = rawJobDeadline.startsWith('timer') ? rawJobDeadline.substring(5) : rawJobDeadline;
-        jobs.push(`${jobTitle} - ${jobFrom} - ${jobPercentage} - ${jobDeadline}`);
+    
+    const allJobs = [];
+    let i = 0;
+    const imax = 10;
+    while (true) {
+      if (i > imax) {
+        break;
       }
-      );
-      return jobs;
-    });
+      try {
+        await page.goto(`https://www.kuleuven.be/personeel/jobsite/jobs/phd?lang=en&page=${i}`, { waitUntil: 'networkidle2' });
+
+        // Wait for the element to appear in the page
+        await page.waitForSelector('#results_card', { timeout: 10000 });
+
+        const resultsCardExists = await page.evaluate(() => document.querySelector('div.row.mt-2').children.length > 0);
+        if (!resultsCardExists) {
+          break;
+        }
+
+        
+
+        const jobs = await page.evaluate(() => {
+          const jobs = [];
+          const jobWrappers = document.querySelector('#results_card');
+          const jobRows = jobWrappers.querySelectorAll('.card-block');
+          jobRows.forEach((jobRow) => {
+            const jobTitleElement = jobRow.querySelector('h6');
+            const jobTitle = jobTitleElement ? jobTitleElement.textContent.trim() : '';
+        
+            const paragraphs = Array.from(jobRow.querySelectorAll('p'));
+            const jobFrom = paragraphs.length > 0 ? paragraphs[paragraphs.length - 1].textContent.trim() : '';
+        
+            const rawJobPercentageElement = jobRow.querySelector('.ocupation');
+            const rawJobPercentage = rawJobPercentageElement ? rawJobPercentageElement.textContent.trim() : '';
+            const jobPercentage = rawJobPercentage.startsWith('av_timer') ? rawJobPercentage.substring(8) : rawJobPercentage;
+        
+            const rawJobDeadlineElement = jobRow.querySelector('.apply_before');
+            const rawJobDeadline = rawJobDeadlineElement ? rawJobDeadlineElement.textContent.trim() : '';
+            const jobDeadline = rawJobDeadline.startsWith('timer') ? rawJobDeadline.substring(5) : rawJobDeadline;
+        
+            jobs.push(`${jobTitle} - ${jobFrom} - ${jobPercentage} - ${jobDeadline}`);
+          });
+          return jobs;
+        });
+        console.log('i:', i);
+        allJobs.push(...jobs);
+        i++;
+      } catch (error) {
+        console.log(error);
+        break;
+      }
+  }
    
   
     await browser.close();
-    return jobs;
+    return allJobs;
   }
 
   // TODO: not working since I cant get the job list
