@@ -17,6 +17,45 @@ export class AppController {
     return this.appService.getRoot();
   }
 
+  @Get('/cth-jobs')
+  async scrapeCthJobs(): Promise<string[]> {
+    const browser = await puppeteer.launch({ headless: 'new' });
+    const page = await browser.newPage();
+    page.setDefaultNavigationTimeout(10000);
+    await page.goto('https://www.chalmers.se/en/about-chalmers/work-with-us/vacancies/');
+  
+    // Wait for the iframe to load
+    await page.waitForSelector('iframe');
+  
+    // Get the iframe
+    const iframeElement = await page.$('iframe');
+    const frame = await iframeElement.contentFrame();
+  
+
+    // Get job data from the current page
+    const jobs = await frame.evaluate(() => {
+      const jobWrappers = document.querySelectorAll('tbody > tr');
+      const jobs = [];
+      jobWrappers.forEach((jobWrapper) => {
+        const jobLink = jobWrapper.querySelector('a').getAttribute('href').trim();
+        const jobTitle = jobWrapper.firstElementChild.nextElementSibling.textContent.trim();
+        const jobDeadline = jobWrapper.lastElementChild.textContent.trim();
+        jobs.push(`${jobTitle} - ${jobLink} - ${jobDeadline}`);
+      })
+      return jobs;
+    });
+  
+     
+  
+    await browser.close();
+    return jobs;
+  }
+
+  @Get('/uva-jobs')
+  async scrapeUvaJobs(): Promise<string[]> {
+    return ['need to implement'];
+  }
+
   @Get('/kth-jobs')
   async scrapeKthJobs(): Promise<string[]> {
     const { data } = await axios.get(
