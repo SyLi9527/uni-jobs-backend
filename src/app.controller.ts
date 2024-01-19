@@ -17,6 +17,29 @@ export class AppController {
     return this.appService.getRoot();
   }
 
+  @Get('/kth-jobs')
+  async scrapeKthJobs(): Promise<string[]> {
+    const { data } = await axios.get(
+      'https://www.kth.se/lediga-jobb?l=en',
+    );
+    const $ = cheerio.load(data);
+    const jobs = [];
+    $('table.table > tbody > tr').each((_, tr) => {
+      const firstChild = $(tr).children().first();
+      const jobTitle = firstChild.text().trim();
+      const jobLink = 'https://www.kth.se' + firstChild.find('a').attr('href').trim();
+      const secondChild = firstChild.next();
+      const jobLocation = secondChild.text().trim();
+      const thirdChild = secondChild.next();
+      const jobFrom = thirdChild.text().trim();
+      const fourthChild = thirdChild.next();
+      const jobDeadline = fourthChild.text().trim();
+
+      jobs.push(`${jobTitle} - ${jobLink} - ${jobLocation} - ${jobFrom} - ${jobDeadline}`);
+    });
+
+    return jobs;
+  }
 
   @Get('/tue-jobs')
   async scrapeTueJobs(): Promise<string[]> {
