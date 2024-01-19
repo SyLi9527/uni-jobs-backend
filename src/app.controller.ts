@@ -18,14 +18,43 @@ export class AppController {
   }
 
 
-  @Get('kul-jobs')
+  @Get('/tue-jobs')
+  async scrapeTueJobs(): Promise<string[]> {
+    const browser = await puppeteer.launch({ headless: 'new' });
+    const page = await browser.newPage();
+
+    await page.goto(`https://jobs.tue.nl/en/vacancies.html`, { waitUntil: 'networkidle2' });
+    await page.waitForSelector('#jobslist', { timeout: 10000 });
+
+    const jobs = await page.evaluate(() => {
+      const jobs = [];
+      const jobWrappers = document.querySelector('#jobslist');
+      const jobRows = jobWrappers.querySelectorAll('.jobpost');
+      jobRows.forEach((jobRow) => {
+        const jobTitleElement = jobRow.querySelector('h2');
+        const jobTitle = jobTitleElement ? jobTitleElement.textContent.trim() : '';
+        const jobLink = jobTitleElement ? jobTitleElement.querySelector('a').getAttribute('href').trim() : '';
+       
+        const jobClassifications = jobRow.querySelector('span.job_classifications').textContent.trim();
+        const jobDate = jobRow.querySelector('span.job_date').textContent.trim();
+    
+        jobs.push(`${jobTitle} - ${jobLink} - ${jobClassifications} - ${jobDate}`);
+      });
+      return jobs;
+    });
+      
+    await browser.close();
+    return jobs;
+  }
+
+  @Get('/kul-jobs')
   async scrapeKulJobs(): Promise<string[]> {
     const browser = await puppeteer.launch({ headless: 'new' });
     const page = await browser.newPage();
     
     const allJobs = [];
     let i = 0;
-    const imax = 10;
+    const imax = 20;
     while (true) {
       if (i > imax) {
         break;
@@ -40,8 +69,6 @@ export class AppController {
         if (!resultsCardExists) {
           break;
         }
-
-        
 
         const jobs = await page.evaluate(() => {
           const jobs = [];
@@ -66,7 +93,7 @@ export class AppController {
           });
           return jobs;
         });
-        console.log('i:', i);
+        
         allJobs.push(...jobs);
         i++;
       } catch (error) {
@@ -90,13 +117,14 @@ export class AppController {
     // page.on('console', msg => console.log('PAGE LOG:', msg.text()));
   
     page.setDefaultNavigationTimeout(10000);
-    await page.goto('https://www.tudelft.nl/over-tu-delft/werken-bij-tu-delft/vacatures');
+    await page.goto('https://www.tudelft.nl/en/about-tu-delft/working-at-tu-delft/search-jobs', { waitUntil: 'networkidle2' });
     // Wait for the element to appear in the page
     // Wait for the fetch request to complete
-    await page.waitForResponse(response => {
-      // Replace 'https://api.example.com/data' with the URL of the fetch request
-      return response.url().includes('https://emea3.recruitmentplatform.com/fo/rest/jobs');
-    });
+    // await page.waitForResponse(response => {
+    //   // Replace 'https://api.example.com/data' with the URL of the fetch request
+    //   return response.url().includes('https://emea3.recruitmentplatform.com/fo/rest/jobs');
+    // });
+    await page.waitForSelector('#talentlinkJobsList', { timeout: 10000 });
     console.log('page loaded');
 
     const jobs = await page.evaluate(() => {
